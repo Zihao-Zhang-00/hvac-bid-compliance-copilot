@@ -1,4 +1,7 @@
+
 from fastapi import FastAPI, File, UploadFile, HTTPException, status
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 app = FastAPI(
     title="HVAC Bid Compliance Copilot API",
@@ -12,7 +15,7 @@ def health_check():
 
 
 @app.post("/tenders/upload")
-async def upload_tender(file: UploadFile = File(...)):
+def upload_tender(file: UploadFile = File(...)):
 
     filename = file.filename or ""
 
@@ -22,8 +25,9 @@ async def upload_tender(file: UploadFile = File(...)):
             detail="Only PDF files are supported"
         )
 
-    header = await file.read(5)
-    await file.seek(0)
+    stream = file.file
+    header = stream.read(5)
+    stream.seek(0)
 
     if header != b"%PDF-":
         raise HTTPException(
@@ -31,7 +35,35 @@ async def upload_tender(file: UploadFile = File(...)):
             detail="Invalid PDF file content"
         )
 
+    try:
+        reader = PdfReader(stream)
+
+        if reader.is_encrypted:
+            raise HTTPException(
+                status_code=422,
+                detail="Encrypted PDF files are not supported"
+            )
+
+        page_count = len(reader.pages)
+
+    except PdfReadError:
+        raise HTTPException(
+            status_code=422,
+            detail="Unable to read PDF structure"
+        )
+
+    finally:
+        stream.seek(0)
+
+    if page_count == 0:
+        raise HTTPException(
+            status_code=422,
+            detail="PDF contains no pages"
+        )
+
     return {
         "filename": filename,
+        "filetype": "application/pdf",
+        "page_count": page_count,
         "status": "received"
     }
