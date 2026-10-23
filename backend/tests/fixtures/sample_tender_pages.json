@@ -1,0 +1,29 @@
+{
+  "document_id": "synthetic-hvac-tender-001",
+  "pages": [
+    {
+      "page_number": 1,
+      "text": "Each bidder must hold a valid HVAC contractor license at the time of submission.\nBidders must provide references for at least two completed commercial HVAC projects."
+    },
+    {
+      "page_number": 2,
+      "text": "The proposed project manager must hold a current professional engineering license.\nResumes of additional installation technicians may be included to support the bid."
+    },
+    {
+      "page_number": 3,
+      "text": "The proposed air-cooled chiller must have a COP of at least 5.8 according to the manufacturer's technical datasheet.\nAll proposed units must use R-32 refrigerant."
+    },
+    {
+      "page_number": 4,
+      "text": "Up to 10 evaluation points will be awarded for documented energy-efficiency improvements beyond the required COP.\nThe bid package must include a signed compliance declaration form."
+    },
+    {
+      "page_number": 5,
+      "text": "Bidders may attach an optional installation schedule for reference.\nAdditional compliance information should be supplied when considered appropriate by the evaluation committee."
+    },
+    {
+      "page_number": 6,
+      "text": "The existing facility includes three office floors and a mechanical plant. The building modernization program was initiated in 2025."
+    }
+  ]
+}
