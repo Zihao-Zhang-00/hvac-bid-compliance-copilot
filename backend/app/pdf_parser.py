@@ -1,5 +1,7 @@
 from io import BytesIO
+
 from pypdf import PdfReader
+
 
 class PDFParseError(Exception):
     """Raised when a PDF cannot be parsed."""
@@ -35,6 +37,12 @@ def parse_pdf(pdf_bytes: bytes) -> dict:
                 "text": text.strip()
             })
 
+        if not any(page["text"].strip() for page in pages):
+            raise PDFParseError(
+                "No extractable text found in PDF. OCR may be required."
+            )
+
+        
         return {
             "page_count": len(pages),
             "pages": pages,

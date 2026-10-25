@@ -115,6 +115,12 @@ async def parse_tender_document(file: UploadFile = File(...)):
 
     pdf_bytes = await file.read()
 
+    if len(pdf_bytes) > MAX_PDF_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail="PDF exceeds the 20 MB size limit"
+        )
+
     if not pdf_bytes:
         raise HTTPException(
             status_code=400,

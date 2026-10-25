@@ -25,8 +25,27 @@ def create_test_pdf(page_count=2, encrypted=False):
 
     return buffer.getvalue()
 
+def create_text_pdf(page_count=2):
+    """Create a PDF containing extractable text."""
+
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer)
+
+    for page_number in range(page_count):
+        c.drawString(
+            100,
+            700,
+            f"HVAC Tender Document - Page {page_number + 1}"
+        )
+        c.showPage()
+
+    c.save()
+
+    return buffer.getvalue()
+
+
 def test_parse_single_page():
-    pdf_data = create_test_pdf(page_count=1)
+    pdf_data = create_text_pdf(page_count=1)
     result = parse_pdf(pdf_data)
     assert result["page_count"] == 1
     assert len(result["pages"]) == 1
@@ -37,7 +56,7 @@ def test_parse_single_page():
 
 def test_parse_multiple_pages():
 
-    pdf_data = create_test_pdf(3)
+    pdf_data = create_text_pdf(3)
 
     result = parse_pdf(pdf_data)
 
@@ -147,7 +166,7 @@ def test_extract_real_text():
 
 
 def test_parse_api_success():
-    pdf_data = create_test_pdf(2)
+    pdf_data = create_text_pdf(2)
 
     response = client.post(
         "/tenders/parse",
@@ -227,3 +246,47 @@ def test_parse_api_corrupted_pdf():
 
     assert response.status_code == 422
     assert "detail" in response.json()
+
+def test_parse_api_oversized_pdf():
+    large_data = b"x" * (20 * 1024 * 1024 + 1)
+
+    response = client.post(
+        "/tenders/parse",
+        files={
+            "file": (
+                "large.pdf",
+                large_data,
+                "application/pdf"
+            )
+        }
+    )
+
+    print("Status code:", response.status_code)
+    print("Response:", response.json())
+    assert response.status_code == 413
+
+def test_parse_blank_pdf():
+    pdf_data = create_test_pdf(page_count=1)
+
+    with pytest.raises(
+        PDFParseError,
+        match="No extractable text"
+    ):
+        parse_pdf(pdf_data)
+
+def test_parse_pdf_with_blank_page():
+    buffer = BytesIO()
+
+    c = canvas.Canvas(buffer)
+    c.drawString(100, 750, "HVAC Tender Requirements")
+    c.showPage()
+
+    # Second page is intentionally blank
+    c.showPage()
+    c.save()
+
+    result = parse_pdf(buffer.getvalue())
+
+    assert result["page_count"] == 2
+    assert "HVAC Tender Requirements" in result["pages"][0]["text"]
+    assert result["pages"][1]["text"] == ""       
