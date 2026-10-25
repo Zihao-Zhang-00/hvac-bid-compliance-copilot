@@ -1,8 +1,9 @@
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, status
+from fastapi import FastAPI, File, HTTPException, UploadFile, status
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 
+from app.pdf_parser import PDFParseError, parse_pdf
 
 MAX_PDF_SIZE = 20 * 1024 * 1024  # 20 MiB
 
@@ -95,3 +96,65 @@ def upload_tender(file: UploadFile = File(...)):
         "page_count": page_count,
         "status": "received"
     }
+
+@app.post("/tenders/parse")
+async def parse_tender_document(file: UploadFile = File(...)):
+    """
+    Parse an uploaded tender pdf and return
+    extracted text with page numbers.
+    """
+
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+
+            status_code=415,
+
+            detail="Only PDF files are supported"
+
+        )
+
+    pdf_bytes = await file.read()
+
+    if len(pdf_bytes) > MAX_PDF_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail="PDF exceeds the 20 MB size limit"
+        )
+
+    if not pdf_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded PDF is empty"
+        )
+
+    if not pdf_bytes.startswith(b"%PDF-"):
+        raise HTTPException(
+            status_code=415,
+            detail="Invalid PDF file"
+        )
+
+    try:
+
+        result = parse_pdf(pdf_bytes)
+
+        return {
+
+            "filename": file.filename,
+
+            **result
+
+        }
+
+    except PDFParseError as exc:
+
+        raise HTTPException(
+
+            status_code=422,
+
+            detail=str(exc)
+
+        )
+
+    finally:
+
+        await file.close()
