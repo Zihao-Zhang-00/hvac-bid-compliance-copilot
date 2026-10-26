@@ -3,6 +3,7 @@ import json
 from typing import Protocol
 
 from app.requirement_schema import RequirementExtractionResult
+from app.requirement_uncertainty import flag_uncertain_requirements
 from app.requirement_validation import validate_and_normalize_requirements
 
 
@@ -67,7 +68,9 @@ def extract_requirements(
 
     raw_json = client.complete(SYSTEM_PROMPT, user_prompt)
 
-    return validate_and_normalize_requirements(
+    validated = validate_and_normalize_requirements(
         raw_json,
         page_numbers,
     )
+
+    return flag_uncertain_requirements(validated)
