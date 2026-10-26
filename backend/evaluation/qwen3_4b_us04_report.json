@@ -1,0 +1,150 @@
+{
+  "recorded_at_utc": "2026-10-26T02:24:54.990977+00:00",
+  "document_id": "synthetic-hvac-tender-001",
+  "model": "qwen3:4b-instruct",
+  "prompt_sha256": "69d0eb303689b6240f324721f2fa6bbc9622d490f7b53bc99b2576a171a26e7f",
+  "elapsed_seconds": 5.029,
+  "evaluation": {
+    "counts": {
+      "expected": 10,
+      "predicted": 10,
+      "matched": 10,
+      "false_positive": 0,
+      "false_negative": 0
+    },
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "field_accuracy": {
+      "category": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 1.0
+      },
+      "mandatory": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 1.0
+      },
+      "needs_review": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 1.0
+      }
+    },
+    "missing": [],
+    "unexpected": [],
+    "field_mismatches": {
+      "category": [],
+      "mandatory": [],
+      "needs_review": []
+    },
+    "missing_evidence_suggestions": [
+      {
+        "source_page": 1,
+        "requirement_text": "Each bidder must hold a valid HVAC contractor license at the time of submission."
+      },
+      {
+        "source_page": 2,
+        "requirement_text": "The proposed project manager must hold a current professional engineering license."
+      },
+      {
+        "source_page": 2,
+        "requirement_text": "Resumes of additional installation technicians may be included to support the bid."
+      },
+      {
+        "source_page": 3,
+        "requirement_text": "All proposed units must use R-32 refrigerant."
+      },
+      {
+        "source_page": 5,
+        "requirement_text": "Bidders may attach an optional installation schedule for reference."
+      }
+    ],
+    "unsupported_source_quotes": []
+  },
+  "extracted_requirements": {
+    "requirements": [
+      {
+        "requirement_text": "Each bidder must hold a valid HVAC contractor license at the time of submission.",
+        "category": "qualification",
+        "mandatory": true,
+        "source_page": 1,
+        "evidence_needed": null,
+        "needs_review": false
+      },
+      {
+        "requirement_text": "Bidders must provide references for at least two completed commercial HVAC projects.",
+        "category": "qualification",
+        "mandatory": true,
+        "source_page": 1,
+        "evidence_needed": "references for completed commercial HVAC projects",
+        "needs_review": false
+      },
+      {
+        "requirement_text": "The proposed project manager must hold a current professional engineering license.",
+        "category": "personnel",
+        "mandatory": true,
+        "source_page": 2,
+        "evidence_needed": null,
+        "needs_review": false
+      },
+      {
+        "requirement_text": "Resumes of additional installation technicians may be included to support the bid.",
+        "category": "personnel",
+        "mandatory": false,
+        "source_page": 2,
+        "evidence_needed": null,
+        "needs_review": false
+      },
+      {
+        "requirement_text": "The proposed air-cooled chiller must have a COP of at least 5.8 according to the manufacturer's technical datasheet.",
+        "category": "technical",
+        "mandatory": true,
+        "source_page": 3,
+        "evidence_needed": "manufacturer's technical datasheet",
+        "needs_review": false
+      },
+      {
+        "requirement_text": "All proposed units must use R-32 refrigerant.",
+        "category": "technical",
+        "mandatory": true,
+        "source_page": 3,
+        "evidence_needed": null,
+        "needs_review": false
+      },
+      {
+        "requirement_text": "Up to 10 evaluation points will be awarded for documented energy-efficiency improvements beyond the required COP.",
+        "category": "scoring",
+        "mandatory": false,
+        "source_page": 4,
+        "evidence_needed": "documented energy-efficiency improvements",
+        "needs_review": false
+      },
+      {
+        "requirement_text": "The bid package must include a signed compliance declaration form.",
+        "category": "documentation",
+        "mandatory": true,
+        "source_page": 4,
+        "evidence_needed": "signed compliance declaration form",
+        "needs_review": false
+      },
+      {
+        "requirement_text": "Bidders may attach an optional installation schedule for reference.",
+        "category": "documentation",
+        "mandatory": false,
+        "source_page": 5,
+        "evidence_needed": null,
+        "needs_review": false
+      },
+      {
+        "requirement_text": "Additional compliance information should be supplied when considered appropriate by the evaluation committee.",
+        "category": "unknown",
+        "mandatory": null,
+        "source_page": 5,
+        "evidence_needed": null,
+        "needs_review": true
+      }
+    ]
+  }
+}

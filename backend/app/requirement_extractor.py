@@ -2,6 +2,7 @@
 import json
 from typing import Protocol
 
+from app.requirement_classifier import classify_requirements
 from app.requirement_schema import RequirementExtractionResult
 from app.requirement_uncertainty import flag_uncertain_requirements
 from app.requirement_validation import validate_and_normalize_requirements
@@ -73,4 +74,5 @@ def extract_requirements(
         page_numbers,
     )
 
-    return flag_uncertain_requirements(validated)
+    reviewed = flag_uncertain_requirements(validated)
+    return classify_requirements(reviewed)
