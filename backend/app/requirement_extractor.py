@@ -3,6 +3,7 @@ import json
 from typing import Protocol
 
 from app.requirement_schema import RequirementExtractionResult
+from app.requirement_validation import validate_and_normalize_requirements
 
 
 SYSTEM_PROMPT = """You are an HVAC tender requirement extraction component.
@@ -66,10 +67,7 @@ def extract_requirements(
 
     raw_json = client.complete(SYSTEM_PROMPT, user_prompt)
 
-    result = RequirementExtractionResult.model_validate_json(raw_json)
-
-    for requirement in result.requirements:
-        if requirement.source_page not in page_numbers:
-            raise ValueError("LLM returned a source page absent from input")
-
-    return result
+    return validate_and_normalize_requirements(
+        raw_json,
+        page_numbers,
+    )
