@@ -71,12 +71,16 @@ def test_exact_duplicate_is_removed():
     assert len(result.requirements) == 1
 
 
-def test_conflicting_duplicate_is_rejected():
+def test_conflicting_duplicate_is_marked_for_review():
     first = make_requirement(category="qualification")
     second = make_requirement(category="documentation")
 
-    with pytest.raises(ValueError, match="Conflicting duplicate"):
-        validate([first, second])
+    result = validate([first, second])
+    assert len(result.requirements) == 1
+    merged = result.requirements[0]
+    assert merged.category.value == "unknown"
+    assert merged.mandatory is True
+    assert merged.needs_review is True
 
 
 @pytest.mark.parametrize(

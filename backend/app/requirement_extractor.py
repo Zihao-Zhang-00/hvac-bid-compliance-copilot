@@ -2,8 +2,11 @@
 import json
 from typing import Protocol
 
+from app.requirement_recovery import quarantine_unsupported_categories
+from app.requirement_quote_review import flag_unmatched_source_quotes
 from app.requirement_schema import RequirementExtractionResult
 from app.requirement_uncertainty import flag_uncertain_requirements
+from app.requirement_provenance import reconcile_source_pages
 from app.requirement_validation import validate_and_normalize_requirements
 
 
@@ -68,9 +71,13 @@ def extract_requirements(
 
     raw_json = client.complete(SYSTEM_PROMPT, user_prompt)
 
+    recovered_json = quarantine_unsupported_categories(raw_json)
+    recovered_json = reconcile_source_pages(recovered_json, pages)
+
     validated = validate_and_normalize_requirements(
-        raw_json,
+        recovered_json,
         page_numbers,
     )
 
-    return flag_uncertain_requirements(validated)
+    reviewed = flag_uncertain_requirements(validated)
+    return flag_unmatched_source_quotes(reviewed, pages)

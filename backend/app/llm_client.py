@@ -42,3 +42,42 @@ class OpenAICompatibleLLM:
             raise ValueError("LLM returned empty or non-text content")
 
         return content
+
+from app.requirement_schema import RequirementExtractionResult
+
+
+@dataclass(frozen=True)
+class OllamaStructuredLLM:
+    """Local Ollama chat client constrained by the requirement JSON Schema."""
+
+    endpoint: str
+    model: str
+    timeout: float = 300.0
+
+    def complete(self, system_prompt: str, user_prompt: str) -> str:
+        """Return raw JSON; the extraction pipeline validates its contents."""
+        response = httpx.post(
+            self.endpoint,
+            json={
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "format": RequirementExtractionResult.model_json_schema(),
+                "stream": False,
+                "options": {"temperature": 0},
+            },
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+
+        try:
+            content = response.json()["message"]["content"]
+        except (ValueError, TypeError, KeyError, IndexError) as exc:
+            raise ValueError("Unexpected Ollama response format") from exc
+
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("Ollama returned empty or non-text content")
+
+        return content

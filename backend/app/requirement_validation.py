@@ -1,6 +1,13 @@
 """Validate and normalize LLM-extracted tender requirements."""
 
-from app.requirement_schema import RequirementExtractionResult
+import logging
+
+from app.requirement_schema import (
+    RequirementCategory,
+    RequirementExtractionResult,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def validate_and_normalize_requirements(
@@ -36,14 +43,46 @@ def validate_and_normalize_requirements(
         )
 
         if key in seen:
-            if seen[key] != requirement:
-                raise ValueError(
-                    "Conflicting duplicate requirement: "
-                    f"page {requirement.source_page}"
+            index = seen[key]
+            previous = unique_requirements[index]
+
+            if previous != requirement:
+                logger.warning(
+                    "Conflicting duplicate on page %s: %r | "
+                    "category=%s/%s mandatory=%s/%s evidence=%r/%r; "
+                    "human review required",
+                    requirement.source_page,
+                    requirement.requirement_text,
+                    previous.category.value,
+                    requirement.category.value,
+                    previous.mandatory,
+                    requirement.mandatory,
+                    previous.evidence_needed,
+                    requirement.evidence_needed,
+                )
+                unique_requirements[index] = previous.model_copy(
+                    update={
+                        "category": (
+                            previous.category
+                            if previous.category == requirement.category
+                            else RequirementCategory.UNKNOWN
+                        ),
+                        "mandatory": (
+                            previous.mandatory
+                            if previous.mandatory == requirement.mandatory
+                            else None
+                        ),
+                        "evidence_needed": (
+                            previous.evidence_needed
+                            if previous.evidence_needed == requirement.evidence_needed
+                            else None
+                        ),
+                        "needs_review": True,
+                    }
                 )
             continue
 
-        seen[key] = requirement
+        seen[key] = len(unique_requirements)
         unique_requirements.append(requirement)
 
     return RequirementExtractionResult(

@@ -100,7 +100,7 @@ def test_invalid_model_json():
 def test_hallucinated_page_is_rejected():
     response = json.dumps({
         "requirements": [{
-            "requirement_text": "Required permit.",
+            "requirement_text": "Nonexistent HVAC permit requirement.",
             "category": "qualification",
             "mandatory": True,
             "source_page": 99,
