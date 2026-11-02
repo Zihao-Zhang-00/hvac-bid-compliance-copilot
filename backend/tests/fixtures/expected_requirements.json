@@ -1,0 +1,84 @@
+{
+  "requirements": [
+    {
+      "requirement_text": "Each bidder must hold a valid HVAC contractor license at the time of submission.",
+      "category": "qualification",
+      "mandatory": true,
+      "source_page": 1,
+      "evidence_needed": "Valid HVAC contractor license",
+      "needs_review": false
+    },
+    {
+      "requirement_text": "Bidders must provide references for at least two completed commercial HVAC projects.",
+      "category": "qualification",
+      "mandatory": true,
+      "source_page": 1,
+      "evidence_needed": "Completed HVAC project reference records",
+      "needs_review": false
+    },
+    {
+      "requirement_text": "The proposed project manager must hold a current professional engineering license.",
+      "category": "personnel",
+      "mandatory": true,
+      "source_page": 2,
+      "evidence_needed": "Project manager's engineering license",
+      "needs_review": false
+    },
+    {
+      "requirement_text": "Resumes of additional installation technicians may be included to support the bid.",
+      "category": "personnel",
+      "mandatory": false,
+      "source_page": 2,
+      "evidence_needed": "Additional technician resumes",
+      "needs_review": false
+    },
+    {
+      "requirement_text": "The proposed air-cooled chiller must have a COP of at least 5.8 according to the manufacturer's technical datasheet.",
+      "category": "technical",
+      "mandatory": true,
+      "source_page": 3,
+      "evidence_needed": "Manufacturer technical datasheet",
+      "needs_review": false
+    },
+    {
+      "requirement_text": "All proposed units must use R-32 refrigerant.",
+      "category": "technical",
+      "mandatory": true,
+      "source_page": 3,
+      "evidence_needed": "Manufacturer technical datasheet",
+      "needs_review": false
+    },
+    {
+      "requirement_text": "Up to 10 evaluation points will be awarded for documented energy-efficiency improvements beyond the required COP.",
+      "category": "scoring",
+      "mandatory": false,
+      "source_page": 4,
+      "evidence_needed": "Supporting efficiency documentation",
+      "needs_review": false
+    },
+    {
+      "requirement_text": "The bid package must include a signed compliance declaration form.",
+      "category": "documentation",
+      "mandatory": true,
+      "source_page": 4,
+      "evidence_needed": "Signed compliance declaration form",
+      "needs_review": false
+    },
+    {
+      "requirement_text": "Bidders may attach an optional installation schedule for reference.",
+      "category": "documentation",
+      "mandatory": false,
+      "source_page": 5,
+      "evidence_needed": "Installation schedule",
+      "needs_review": false
+    },
+    {
+      "requirement_text": "Additional compliance information should be supplied when considered appropriate by the evaluation committee.",
+      "category": "unknown",
+      "mandatory": null,
+      "source_page": 5,
+      "evidence_needed": null,
+      "needs_review": true
+    }
+  ]
+}
