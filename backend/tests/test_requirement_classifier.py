@@ -58,6 +58,10 @@ def classify_one(text, category="documentation", **changes):
             RequirementCategory.PERSONNEL,
         ),
         (
+            "CVs for the proposed engineers must be included.",
+            RequirementCategory.PERSONNEL,
+        ),
+        (
             "Up to 10 evaluation points will be awarded for better COP.",
             RequirementCategory.SCORING,
         ),
@@ -146,6 +150,31 @@ def test_review_flag_and_noncategory_fields_are_preserved():
     assert original.category == RequirementCategory.QUALIFICATION
 
 
+def test_compound_technical_and_documentation_clause_requires_review():
+    _, actual = classify_one(
+        "Submit a completed schedule confirming the proposed R-32 refrigerant."
+    )
+    assert actual.category == RequirementCategory.UNKNOWN
+    assert actual.needs_review is True
+
+
+def test_classification_is_idempotent_for_conflicting_clause():
+    original = RequirementExtractionResult(
+        requirements=[
+            make_requirement(
+                "The bidder's project manager must hold a valid engineering license."
+            )
+        ]
+    )
+
+    classified_once = classify_requirements(original)
+    classified_twice = classify_requirements(classified_once)
+
+    assert classified_twice == classified_once
+    assert original.requirements[0].category == RequirementCategory.DOCUMENTATION
+    assert original.requirements[0].needs_review is False
+
+
 def test_empty_list_is_supported():
     result = classify_requirements(RequirementExtractionResult(requirements=[]))
     assert result.requirements == []
@@ -175,6 +204,31 @@ def test_mocked_pipeline_corrects_reference_and_manager():
     ]
 
 
+def test_pipeline_preserves_existing_review_flag_and_noncategory_fields():
+    requirement = make_requirement(
+        "The proposed engineer must include a current CV.",
+        category="qualification",
+        mandatory=False,
+        source_page=7,
+        evidence_needed="Current CV",
+        needs_review=True,
+    )
+
+    class FakeLLM:
+        def complete(self, system_prompt, user_prompt):
+            return json.dumps(
+                {"requirements": [requirement.model_dump(mode="json")]}
+            )
+
+    pages = [{"page_number": 7, "text": requirement.requirement_text}]
+    actual = extract_requirements(pages, FakeLLM()).requirements[0]
+
+    assert actual.category == RequirementCategory.PERSONNEL
+    assert actual.needs_review is True
+    for field in ("mandatory", "source_page", "requirement_text", "evidence_needed"):
+        assert getattr(actual, field) == getattr(requirement, field)
+
+
 def test_synthetic_fixture_categories_are_correct_after_classification():
     tender = json.loads(
         (FIXTURES / "sample_tender_pages.json").read_text(encoding="utf-8")
@@ -184,15 +238,25 @@ def test_synthetic_fixture_categories_are_correct_after_classification():
     )
     # Deliberately inject the three category errors observed in the Qwen baseline.
     predicted = [r.model_copy() for r in expected.requirements]
-    for index, wrong_category in ((1, "documentation"), (2, "qualification"), (9, "documentation")):
+    for index, wrong_category in (
+        (1, "documentation"),
+        (2, "qualification"),
+        (9, "documentation"),
+    ):
         predicted[index] = predicted[index].model_copy(
             update={"category": RequirementCategory(wrong_category)}
         )
+
     class FakeLLM:
         def complete(self, system_prompt, user_prompt):
-            return json.dumps({
-                "requirements": [r.model_dump(mode="json") for r in predicted]
-            })
+            return json.dumps(
+                {
+                    "requirements": [
+                        requirement.model_dump(mode="json")
+                        for requirement in predicted
+                    ]
+                }
+            )
 
     result = extract_requirements(tender["pages"], FakeLLM())
     assert [r.category for r in result.requirements] == [

@@ -15,7 +15,7 @@ _ROLE = re.compile(
 )
 _PERSONNEL_EVIDENCE = re.compile(
     r"\b(?:licen[cs]e|certificat(?:e|ion)|credentials?|qualifications?|"
-    r"resumes?|curriculum vitae|training|professional experience)\b"
+    r"resumes?|cvs?|curriculum vitae|training|professional experience)\b"
 )
 _ORGANIZATION = re.compile(
     r"\b(?:bidders?|contractors?|companies|company|firms?|suppliers?|tenderers?)\b"
