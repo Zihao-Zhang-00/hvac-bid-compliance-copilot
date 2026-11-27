@@ -50,7 +50,8 @@ Open the dashboard at `http://127.0.0.1:8000/`. API documentation remains at
 2. For a short document, leave the page range empty. For a long document, enter
    a start and end page (for example, pages 20–30).
 3. Select **Analyze tender**.
-4. Review coverage warnings before inspecting or filtering requirements.
+4. Review coverage warnings before inspecting actionable requirements, the
+   human-review queue, and the collapsed excluded-candidate diagnostics.
 5. Expand **Source trace** to compare the original model page claim with the
    deterministic `verified_source_page`, then download the response JSON if
    needed.
@@ -85,6 +86,53 @@ Omit both page fields for full-document analysis.
 appears on one parser page. It does **not** mean the tender requirement is
 satisfied, compliant, supported by evidence, or fully reviewed.
 
+## Relevance response and review workflow
+
+The API keeps the existing `TenderRequirement` shape and adds two top-level
+collections:
+
+- `requirements`: high-confidence actionable candidates;
+- `review_queue`: potentially actionable candidates with explicit `reasons`;
+- `excluded`: narrow diagnostics for clear background, history, definition,
+  procurement-description, or marketing text.
+
+Candidates with an existing review flag, uncertain mandatory status, unknown
+category, ambiguous applicability, or missing/ambiguous source match remain in
+`review_queue`. Explicit obligations and disqualification language are never
+excluded by the deterministic relevance gate. Excluded candidates are not
+counted in `summary.requirement_count`; additive summary fields report review
+and exclusion counts. The extraction function and source-tracing models remain
+unchanged, but API consumers should account for the new collections.
+
+Readable-page coverage does not establish extraction recall. Likewise, a
+matched source trace establishes quote provenance, not actionability or tender
+compliance.
+
+## Offline reviewed-label evaluation
+
+Populate a local copy of `requirement_annotations_template.csv` with manually
+confirmed labels, save an analysis response as JSON, then run from `backend`:
+
+```bash
+.venv/bin/python -m app.relevance_evaluation \
+  --ground-truth "/mnt/c/path/to/requirement_annotations.csv" \
+  --predictions "/mnt/c/path/to/tender-analysis.json" \
+  --document-id "document_id_from_inventory" \
+  --output "/mnt/c/path/to/relevance-evaluation.json"
+```
+
+Matching is exact on `document_id`, one-based source page, and the quote after
+case-folding and whitespace normalization. The report includes actionable
+precision/recall, mandatory requirement recall, false-positive/false-negative
+counts, review-queue count, and unmatched-source count. Mandatory recall treats
+mandatory candidates retained in either actionable results or the review queue
+as recalled. The command refuses missing or invalid labels and never creates
+annotations or inferred ground truth.
+
+Use NWACC for development, Glendale for validation, and Worcester only as the
+held-out test. Do not tune rules after inspecting Worcester results. Report no
+metrics until the relevant rows have been manually reviewed.
+
 ## Known limitations
 
 - OCR and scanned-page recovery are not implemented.
@@ -92,5 +140,8 @@ satisfied, compliant, supported by evidence, or fully reviewed.
 - Evidence matching, technical compliance decisions, and final reports are not
   implemented.
 - Page text quality and reading order depend on `pypdf` extraction.
+- Relevance rules are deliberately narrow; novel background phrasing can remain
+  actionable, while ambiguous and compound clauses are escalated for review.
+- Exact quote matching does not align paraphrases or split/merged clauses.
 - The deterministic synthetic tests are regression checks, not real-tender
   accuracy or performance measurements.

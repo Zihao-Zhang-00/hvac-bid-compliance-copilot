@@ -6,6 +6,11 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from app.requirement_extractor import CompletionClient, extract_requirements
+from app.requirement_relevance import (
+    ExcludedCandidate,
+    ReviewQueueItem,
+    partition_requirements,
+)
 from app.requirement_schema import RequirementCategory, TenderRequirement
 
 
@@ -46,6 +51,8 @@ class AnalysisSummary(BaseModel):
 
     requirement_count: int
     needs_review_count: int
+    review_queue_count: int
+    excluded_count: int
     mandatory_count: int
     optional_count: int
     unknown_mandatory_count: int
@@ -65,6 +72,8 @@ class TenderAnalysisResponse(BaseModel):
     pages_without_extractable_text: list[int]
     coverage: DocumentCoverage
     requirements: list[TenderRequirement]
+    review_queue: list[ReviewQueueItem]
+    excluded: list[ExcludedCandidate]
     summary: AnalysisSummary
 
 
@@ -103,18 +112,23 @@ def _requested_pages(
 
 def _summary(
     requirements: list[TenderRequirement],
+    review_queue: list[ReviewQueueItem],
+    excluded: list[ExcludedCandidate],
     input_text_characters: int,
 ) -> AnalysisSummary:
     categories = Counter(requirement.category.value for requirement in requirements)
+    retained = requirements + [item.requirement for item in review_queue]
+    trace_values = [item.source_trace for item in retained]
+    trace_values.extend(item.source_trace for item in excluded)
     traces = Counter(
-        requirement.source_trace.status
-        if requirement.source_trace is not None
-        else "unverified"
-        for requirement in requirements
+        trace.status if trace is not None else "unverified"
+        for trace in trace_values
     )
     return AnalysisSummary(
         requirement_count=len(requirements),
-        needs_review_count=sum(item.needs_review for item in requirements),
+        needs_review_count=len(review_queue),
+        review_queue_count=len(review_queue),
+        excluded_count=len(excluded),
         mandatory_count=sum(item.mandatory is True for item in requirements),
         optional_count=sum(item.mandatory is False for item in requirements),
         unknown_mandatory_count=sum(item.mandatory is None for item in requirements),
@@ -171,6 +185,7 @@ def analyze_parsed_tender(
         )
 
     extraction = extract_requirements(selected_pages, client)
+    relevance = partition_requirements(extraction)
     all_pages = list(range(1, total_page_count + 1))
     full_document_requested = requested_pages == all_pages
     unanalyzed_pages = [page for page in all_pages if page not in analyzed_pages]
@@ -205,6 +220,13 @@ def analyze_parsed_tender(
             unanalyzed_pages=unanalyzed_pages,
             warnings=warnings,
         ),
-        requirements=extraction.requirements,
-        summary=_summary(extraction.requirements, input_text_characters),
+        requirements=relevance.requirements,
+        review_queue=relevance.review_queue,
+        excluded=relevance.excluded,
+        summary=_summary(
+            relevance.requirements,
+            relevance.review_queue,
+            relevance.excluded,
+            input_text_characters,
+        ),
     )

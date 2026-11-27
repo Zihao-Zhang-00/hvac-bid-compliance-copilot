@@ -40,9 +40,9 @@ ANNOTATION_FIELDS = (
     "document_id",
     "exact_quote",
     "source_page",
+    "relevance_label",
+    "obligation_status",
     "category",
-    "mandatory",
-    "actionable",
     "evidence_required",
     "reviewer_notes",
 )

@@ -36,7 +36,12 @@ class ReplayLLM:
         self.calls.append(json.loads(user_prompt))
         if self.error:
             raise self.error
-        requirements = [] if self.requirement is None else [self.requirement]
+        if self.requirement is None:
+            requirements = []
+        elif isinstance(self.requirement, list):
+            requirements = self.requirement
+        else:
+            requirements = [self.requirement]
         return json.dumps({"requirements": requirements})
 
 
@@ -199,12 +204,36 @@ def test_missing_source_is_never_presented_as_verified(monkeypatch):
     response = post_pdf(make_pdf(["Different readable source text."]))
 
     body = response.json()
-    item = body["requirements"][0]
+    assert body["requirements"] == []
+    item = body["review_queue"][0]["requirement"]
     assert response.status_code == 200
     assert item["source_trace"]["status"] == "missing"
     assert item["source_trace"]["verified_source_page"] is None
     assert item["needs_review"] is True
     assert "compliant" not in json.dumps(body).casefold()
+
+
+def test_analysis_partitions_actionable_review_and_excluded_candidates(monkeypatch):
+    background = requirement(text="The project was constructed in 1998.")
+    background["mandatory"] = False
+    uncertain = requirement(text="Additional testing may be required.")
+    uncertain["mandatory"] = None
+    configure(monkeypatch, ReplayLLM([requirement(), background, uncertain]))
+
+    response = post_pdf(make_pdf([
+        f"{CLAUSE} The project was constructed in 1998. "
+        "Additional testing may be required."
+    ]))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["requirement_text"] for item in body["requirements"]] == [CLAUSE]
+    assert body["review_queue"][0]["requirement"]["mandatory"] is None
+    assert "mandatory status is uncertain" in body["review_queue"][0]["reasons"]
+    assert body["excluded"][0]["reason"] == "background_or_history"
+    assert body["summary"]["requirement_count"] == 1
+    assert body["summary"]["review_queue_count"] == 1
+    assert body["summary"]["excluded_count"] == 1
 
 
 def test_environment_factory_supports_existing_clients_without_defaults():
@@ -232,4 +261,7 @@ def test_dashboard_route_is_available_and_targets_analysis_api():
     assert response.status_code == 200
     assert "/tenders/analyze" in response.text
     assert "Source trace" in response.text
+    assert "Actionable Requirements" in response.text
+    assert "Needs Human Review" in response.text
+    assert "Excluded Candidates" in response.text
     assert "Download JSON" in response.text
