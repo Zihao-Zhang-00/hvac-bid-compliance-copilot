@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HVAC Tender Review</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, system-ui, sans-serif; }
+    body { margin: 0; background: #f3f6f8; color: #17212b; }
+    main { max-width: 1180px; margin: auto; padding: 2rem 1rem 4rem; }
+    h1, h2 { margin: 0 0 1rem; }
+    .panel { background: white; border: 1px solid #d9e1e7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+    form, .filters { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; }
+    label { display: grid; gap: .35rem; font-weight: 600; }
+    input, select, button { font: inherit; padding: .55rem .7rem; border: 1px solid #aab8c2; border-radius: 6px; }
+    button { background: #075985; color: white; border: 0; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .muted { color: #52616b; }
+    .notice { padding: .75rem; border-radius: 6px; margin-top: .75rem; white-space: pre-wrap; }
+    .error { background: #fee2e2; color: #991b1b; }
+    .warning { background: #fef3c7; color: #78350f; }
+    .success { background: #dcfce7; color: #166534; }
+    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: .75rem; }
+    .metric { border: 1px solid #d9e1e7; border-radius: 8px; padding: .75rem; }
+    .metric strong { display: block; font-size: 1.3rem; }
+    .table-wrap { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; vertical-align: top; padding: .65rem; border-bottom: 1px solid #e5eaee; }
+    th { background: #edf3f6; }
+    td.requirement { min-width: 340px; white-space: pre-wrap; }
+    .badge { display: inline-block; padding: .15rem .45rem; border-radius: 999px; background: #e5e7eb; }
+    details pre { max-width: 520px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>HVAC Tender Analysis</h1>
+  <p class="muted">Review extracted requirements and their exact source traces. Source verification does not mean a requirement is satisfied.</p>
+
+  <section class="panel">
+    <form id="analysis-form">
+      <label>PDF tender <input id="file" name="file" type="file" accept="application/pdf,.pdf" required></label>
+      <label>Start page <input id="page-start" name="page_start" type="number" min="1" placeholder="Optional"></label>
+      <label>End page <input id="page-end" name="page_end" type="number" min="1" placeholder="Optional"></label>
+      <button id="analyze" type="submit">Analyze tender</button>
+      <button id="download" type="button" disabled>Download JSON</button>
+    </form>
+    <div id="status" class="notice muted">Choose a PDF. Leave both page fields empty for full-document analysis.</div>
+  </section>
+
+  <section id="coverage-panel" class="panel" hidden>
+    <h2>Document coverage</h2>
+    <div id="coverage-summary" class="summary"></div>
+    <div id="coverage-warning"></div>
+  </section>
+
+  <section id="requirements-panel" class="panel" hidden>
+    <h2>Requirements</h2>
+    <div class="filters">
+      <label>Category <select id="category-filter"><option value="">All</option></select></label>
+      <label>Mandatory <select id="mandatory-filter"><option value="">All</option><option value="true">Required</option><option value="false">Optional</option><option value="null">Unknown</option></select></label>
+      <label>Needs review <select id="review-filter"><option value="">All</option><option value="true">Yes</option><option value="false">No</option></select></label>
+    </div>
+    <p id="empty-results" class="muted" hidden>No requirements match the current filters.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Requirement</th><th>Category</th><th>Mandatory</th><th>Review</th><th>Original page</th><th>Verified page</th><th>Source trace</th></tr></thead>
+        <tbody id="requirements-body"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script>
+  const form = document.querySelector('#analysis-form');
+  const statusBox = document.querySelector('#status');
+  const analyzeButton = document.querySelector('#analyze');
+  const downloadButton = document.querySelector('#download');
+  const coveragePanel = document.querySelector('#coverage-panel');
+  const requirementsPanel = document.querySelector('#requirements-panel');
+  const requirementBody = document.querySelector('#requirements-body');
+  const emptyResults = document.querySelector('#empty-results');
+  const filters = ['category-filter', 'mandatory-filter', 'review-filter'].map(id => document.querySelector('#' + id));
+  let responseData = null;
+
+  function metric(label, value) {
+    const node = document.createElement('div');
+    node.className = 'metric';
+    const strong = document.createElement('strong');
+    strong.textContent = value;
+    const text = document.createElement('span');
+    text.textContent = label;
+    node.append(strong, text);
+    return node;
+  }
+
+  function renderCoverage(data) {
+    const summary = document.querySelector('#coverage-summary');
+    summary.replaceChildren(
+      metric('Coverage', data.coverage.status),
+      metric('PDF pages', data.total_page_count),
+      metric('Requested pages', data.requested_pages.join(', ')),
+      metric('Analyzed pages', data.analyzed_pages.join(', ')),
+      metric('Unverified pages', data.pages_without_extractable_text.join(', ') || 'None'),
+      metric('Requirements', data.summary.requirement_count)
+    );
+    const warning = document.querySelector('#coverage-warning');
+    warning.replaceChildren();
+    if (data.coverage.warnings.length) {
+      const box = document.createElement('div');
+      box.className = 'notice warning';
+      box.textContent = data.coverage.warnings.join('\n');
+      warning.append(box);
+    }
+    coveragePanel.hidden = false;
+  }
+
+  function populateCategories(data) {
+    const select = document.querySelector('#category-filter');
+    select.replaceChildren(new Option('All', ''));
+    Object.keys(data.summary.category_counts).forEach(category => select.add(new Option(category, category)));
+  }
+
+  function renderRequirements() {
+    const [category, mandatory, review] = filters.map(filter => filter.value);
+    const items = (responseData?.requirements || []).filter(item =>
+      (!category || item.category === category) &&
+      (!mandatory || String(item.mandatory) === mandatory) &&
+      (!review || String(item.needs_review) === review)
+    );
+    requirementBody.replaceChildren();
+    items.forEach(item => {
+      const trace = item.source_trace;
+      const row = document.createElement('tr');
+      const values = [
+        item.requirement_text,
+        item.category,
+        item.mandatory === null ? 'Unknown' : item.mandatory ? 'Required' : 'Optional',
+        item.needs_review ? 'Yes' : 'No',
+        trace?.original_source_page ?? item.source_page,
+        trace?.verified_source_page ?? 'Unverified'
+      ];
+      values.forEach((value, index) => {
+        const cell = document.createElement('td');
+        cell.textContent = value;
+        if (index === 0) cell.className = 'requirement';
+        row.append(cell);
+      });
+      const traceCell = document.createElement('td');
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = trace?.status || 'unverified';
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(trace, null, 2);
+      details.append(summary, pre);
+      traceCell.append(details);
+      row.append(traceCell);
+      requirementBody.append(row);
+    });
+    emptyResults.hidden = items.length !== 0;
+    requirementsPanel.hidden = false;
+  }
+
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    analyzeButton.disabled = true;
+    downloadButton.disabled = true;
+    coveragePanel.hidden = true;
+    requirementsPanel.hidden = true;
+    statusBox.className = 'notice muted';
+    statusBox.textContent = 'Analyzing selected pages…';
+    const data = new FormData(form);
+    if (!document.querySelector('#page-start').value) data.delete('page_start');
+    if (!document.querySelector('#page-end').value) data.delete('page_end');
+    try {
+      const response = await fetch('/tenders/analyze', { method: 'POST', body: data });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || 'Analysis failed');
+      responseData = payload;
+      statusBox.className = 'notice success';
+      statusBox.textContent = `Analysis completed for ${payload.filename}.`;
+      renderCoverage(payload);
+      populateCategories(payload);
+      renderRequirements();
+      downloadButton.disabled = false;
+    } catch (error) {
+      responseData = null;
+      statusBox.className = 'notice error';
+      statusBox.textContent = error.message;
+    } finally {
+      analyzeButton.disabled = false;
+    }
+  });
+
+  filters.forEach(filter => filter.addEventListener('change', renderRequirements));
+  downloadButton.addEventListener('click', () => {
+    if (!responseData) return;
+    const blob = new Blob([JSON.stringify(responseData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'tender-analysis.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  });
+</script>
+</body>
+</html>

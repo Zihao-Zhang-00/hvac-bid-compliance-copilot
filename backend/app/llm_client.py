@@ -1,7 +1,22 @@
 
+import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import httpx
+
+from app.requirement_schema import RequirementExtractionResult
+
+
+class LLMConfigurationError(ValueError):
+    """Raised when the configured completion provider is incomplete."""
+
+
+def _required_setting(environment: Mapping[str, str], name: str) -> str:
+    value = environment.get(name, "").strip()
+    if not value:
+        raise LLMConfigurationError(f"Missing required LLM setting: {name}")
+    return value
 
 
 @dataclass(frozen=True)
@@ -43,8 +58,6 @@ class OpenAICompatibleLLM:
 
         return content
 
-from app.requirement_schema import RequirementExtractionResult
-
 
 @dataclass(frozen=True)
 class OllamaStructuredLLM:
@@ -81,3 +94,32 @@ class OllamaStructuredLLM:
             raise ValueError("Ollama returned empty or non-text content")
 
         return content
+
+
+def completion_client_from_env(
+    environment: Mapping[str, str] | None = None,
+) -> OpenAICompatibleLLM | OllamaStructuredLLM:
+    """Build one of the existing clients without defaulting models or secrets."""
+
+    values = os.environ if environment is None else environment
+    provider = values.get("LLM_PROVIDER", "").strip().casefold().replace("_", "-")
+    if not provider:
+        raise LLMConfigurationError(
+            "LLM_PROVIDER must be set to 'ollama' or 'openai-compatible'"
+        )
+
+    endpoint = _required_setting(values, "LLM_API_URL")
+    model = _required_setting(values, "LLM_MODEL")
+
+    if provider == "ollama":
+        return OllamaStructuredLLM(endpoint=endpoint, model=model)
+    if provider == "openai-compatible":
+        return OpenAICompatibleLLM(
+            endpoint=endpoint,
+            api_key=_required_setting(values, "LLM_API_KEY"),
+            model=model,
+        )
+
+    raise LLMConfigurationError(
+        "Unsupported LLM_PROVIDER; use 'ollama' or 'openai-compatible'"
+    )
