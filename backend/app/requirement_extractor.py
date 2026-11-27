@@ -29,6 +29,12 @@ Actionable candidates include mandatory, optional, encouraged, conditional,
 qualification, submission, technical, deadline, performance, contract, and
 disqualification clauses. Actionable does not mean mandatory.
 
+Pay particular attention to manufacturer or model restrictions, approved-equal
+or substitute conditions, compatibility constraints, numeric technical limits,
+licenses and qualifications, submission dates and locations, completion or
+performance deadlines, required evidence, and prohibitive bid-response
+instructions. These may impose a constraint without using "must" or "shall".
+
 Set mandatory to true only for an explicit obligation, false for a clearly
 optional or encouraged action, and null when applicability is conditional or
 uncertain. If language might impose an obligation but cannot be interpreted
@@ -50,8 +56,10 @@ class CompletionClient(Protocol):
 def extract_requirements(
     pages: list[dict],
     client: CompletionClient,
+    *,
+    source_pages: list[dict] | None = None,
 ) -> RequirementExtractionResult:
-    """Extract requirements from page-linked text using an LLM client."""
+    """Extract from a page view while verifying quotes against original pages."""
 
     if not isinstance(pages, list) or not pages:
         raise ValueError("At least one page is required")
@@ -83,7 +91,14 @@ def extract_requirements(
     raw_json = client.complete(SYSTEM_PROMPT, user_prompt)
 
     recovered_json = quarantine_unsupported_categories(raw_json)
-    recovered_json = reconcile_source_pages(recovered_json, pages, include_trace=True)
+    provenance_pages = source_pages if source_pages is not None else pages
+    if {page["page_number"] for page in provenance_pages} != page_numbers:
+        raise ValueError("Source pages must match extraction page numbers")
+    recovered_json = reconcile_source_pages(
+        recovered_json,
+        provenance_pages,
+        include_trace=True,
+    )
 
     validated = validate_and_normalize_requirements(
         recovered_json,
@@ -91,6 +106,6 @@ def extract_requirements(
     )
 
     reviewed = flag_uncertain_requirements(validated)
-    source_checked = flag_unmatched_source_quotes(reviewed, pages)
+    source_checked = flag_unmatched_source_quotes(reviewed, provenance_pages)
 
     return classify_requirements(source_checked)

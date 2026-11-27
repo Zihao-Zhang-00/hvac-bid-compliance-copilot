@@ -45,8 +45,8 @@ Each run produces:
 
 The annotation columns are `requirement_id`, `document_id`, `exact_quote`,
 `source_page`, `relevance_label`, `obligation_status`, `category`,
-`evidence_required`, and `reviewer_notes`. Use `actionable`, `excluded`, or
-`review_required` for `relevance_label`; use `mandatory`, `optional`,
+`evidence_required`, and `reviewer_notes`. Use `actionable`, `excluded`,
+`review_required`, or `notice` for `relevance_label`; use `mandatory`, `optional`,
 `conditional`, or `uncertain` for `obligation_status`. Enter exact quotes and
 labels manually; the audit command never exports document text.
 

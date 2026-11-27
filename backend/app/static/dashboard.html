@@ -83,6 +83,19 @@
     </div>
   </section>
 
+  <section id="conflicts-panel" class="panel" hidden>
+    <h2>Date Conflicts</h2>
+    <p class="muted">These event dates conflict or include tentative values. No value has been selected automatically.</p>
+    <p id="empty-conflicts" class="muted">No high-confidence same-event date conflicts were detected.</p>
+    <div id="conflicts-list"></div>
+  </section>
+
+  <section id="notices-panel" class="panel" hidden>
+    <h2>Notices / Context</h2>
+    <p id="empty-notices" class="muted">No contextual notices were identified.</p>
+    <ul id="notices-list"></ul>
+  </section>
+
   <section id="excluded-panel" class="panel" hidden>
     <details>
       <summary><strong>Excluded Candidates</strong> (<span id="excluded-count">0</span>)</summary>
@@ -99,6 +112,8 @@
   const coveragePanel = document.querySelector('#coverage-panel');
   const requirementsPanel = document.querySelector('#requirements-panel');
   const reviewPanel = document.querySelector('#review-panel');
+  const conflictsPanel = document.querySelector('#conflicts-panel');
+  const noticesPanel = document.querySelector('#notices-panel');
   const excludedPanel = document.querySelector('#excluded-panel');
   const requirementBody = document.querySelector('#requirements-body');
   const reviewBody = document.querySelector('#review-body');
@@ -127,6 +142,8 @@
       metric('Unverified pages', data.pages_without_extractable_text.join(', ') || 'None'),
       metric('Actionable', data.summary.requirement_count),
       metric('Needs review', data.summary.review_queue_count),
+      metric('Notices', data.summary.notice_count),
+      metric('Date conflicts', data.summary.date_conflict_count),
       metric('Excluded', data.summary.excluded_count)
     );
     const warning = document.querySelector('#coverage-warning');
@@ -239,6 +256,33 @@
     excludedPanel.hidden = false;
   }
 
+  function renderNotices() {
+    const items = responseData?.notices || [];
+    const list = document.querySelector('#notices-list');
+    list.replaceChildren();
+    items.forEach(item => {
+      const entry = document.createElement('li');
+      entry.textContent = `Page ${item.source_page}: ${item.reason} — ${item.requirement_text}`;
+      list.append(entry);
+    });
+    document.querySelector('#empty-notices').hidden = items.length !== 0;
+    noticesPanel.hidden = false;
+  }
+
+  function renderDateConflicts() {
+    const items = responseData?.date_conflicts || [];
+    const list = document.querySelector('#conflicts-list');
+    list.replaceChildren();
+    items.forEach(item => {
+      const box = document.createElement('div');
+      box.className = 'notice warning';
+      box.textContent = `${item.event_type}: ${item.conflicting_values.join(' vs ')}\nPages: ${item.source_pages.join(', ')}\nStatus: ${item.status} (${item.reason})`;
+      list.append(box);
+    });
+    document.querySelector('#empty-conflicts').hidden = items.length !== 0;
+    conflictsPanel.hidden = false;
+  }
+
   form.addEventListener('submit', async event => {
     event.preventDefault();
     analyzeButton.disabled = true;
@@ -246,6 +290,8 @@
     coveragePanel.hidden = true;
     requirementsPanel.hidden = true;
     reviewPanel.hidden = true;
+    conflictsPanel.hidden = true;
+    noticesPanel.hidden = true;
     excludedPanel.hidden = true;
     statusBox.className = 'notice muted';
     statusBox.textContent = 'Analyzing selected pages…';
@@ -263,6 +309,8 @@
       populateCategories(payload);
       renderRequirements();
       renderReviewQueue();
+      renderDateConflicts();
+      renderNotices();
       renderExcluded();
       downloadButton.disabled = false;
     } catch (error) {

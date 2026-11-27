@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.llm_client import OpenAICompatibleLLM
-from app.requirement_extractor import extract_requirements
+from app.requirement_extractor import SYSTEM_PROMPT, extract_requirements
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -51,6 +51,15 @@ def test_empty_extraction():
     assert result.requirements == []
 
 
+def test_prompt_calls_out_critical_constraints_without_requiring_modal_verbs():
+    prompt = SYSTEM_PROMPT.casefold()
+
+    assert "approved-equal" in prompt
+    assert "manufacturer or model restrictions" in prompt
+    assert "prohibitive bid-response" in prompt
+    assert "instructions" in prompt
+
+
 @pytest.mark.parametrize(
     "pages",
     [
@@ -87,6 +96,30 @@ def test_blank_page_among_readable_pages():
     )
 
     assert result.requirements == []
+
+
+def test_extraction_view_uses_original_pages_for_source_trace():
+    quote = "The bidder shall submit a bond."
+    response = json.dumps({"requirements": [{
+        "requirement_text": quote,
+        "category": "documentation",
+        "mandatory": True,
+        "source_page": 1,
+        "evidence_needed": "Bid bond",
+        "needs_review": False,
+    }]})
+    extraction_pages = [{"page_number": 1, "text": f"{' ' * 12}\n{quote}"}]
+    source_pages = [{"page_number": 1, "text": f"RFP No. 123\n{quote}"}]
+
+    result = extract_requirements(
+        extraction_pages,
+        FakeLLM(response),
+        source_pages=source_pages,
+    )
+
+    evidence = result.requirements[0].source_trace.evidence[0]
+    assert evidence.start_char == source_pages[0]["text"].index(quote)
+    assert evidence.text == quote
 
 
 def test_invalid_model_json():

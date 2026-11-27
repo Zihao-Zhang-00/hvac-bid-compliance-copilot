@@ -9,7 +9,7 @@ from typing import Any
 from app.requirement_schema import RequirementCategory
 
 
-RELEVANCE_LABELS = {"actionable", "excluded", "review_required"}
+RELEVANCE_LABELS = {"actionable", "excluded", "notice", "review_required"}
 OBLIGATION_STATUSES = {"mandatory", "optional", "conditional", "uncertain"}
 
 
@@ -87,12 +87,14 @@ def evaluate_predictions(
 
     actionable_items = predictions.get("requirements", [])
     review_items = predictions.get("review_queue", [])
+    notice_items = predictions.get("notices", [])
     excluded_items = predictions.get("excluded", [])
 
     actionable_keys = {
         _prediction_key(document_id, item) for item in actionable_items
     }
     review_keys = {_prediction_key(document_id, item) for item in review_items}
+    notice_keys = {_prediction_key(document_id, item) for item in notice_items}
     excluded_keys = {_prediction_key(document_id, item) for item in excluded_items}
     retained_keys = actionable_keys | review_keys
     mandatory_true_keys = {
@@ -120,7 +122,7 @@ def evaluate_predictions(
     mandatory_matches = len(truth_mandatory & retained_keys)
     mandatory_classification_matches = len(truth_mandatory & mandatory_true_keys)
 
-    all_items = actionable_items + review_items + excluded_items
+    all_items = actionable_items + review_items + notice_items + excluded_items
     unmatched_source_count = 0
     for item in all_items:
         requirement = _prediction_requirement(item)
@@ -149,10 +151,11 @@ def evaluate_predictions(
         "false_positive_count": false_positives,
         "false_negative_count": false_negatives,
         "review_queue_count": len(review_items),
+        "notice_prediction_count": len(notice_items),
         "excluded_prediction_count": len(excluded_items),
         "unmatched_source_count": unmatched_source_count,
         "matched_prediction_count": len(
-            (actionable_keys | review_keys | excluded_keys)
+            (actionable_keys | review_keys | notice_keys | excluded_keys)
             & {
                 _key(row["document_id"], row["source_page"], row["exact_quote"])
                 for row in ground_truth

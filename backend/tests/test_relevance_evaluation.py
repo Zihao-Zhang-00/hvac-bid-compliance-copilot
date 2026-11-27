@@ -109,6 +109,22 @@ def test_mandatory_retention_and_classification_are_distinct():
     assert metrics["mandatory_classification_recall"] == pytest.approx(1 / 3)
 
 
+def test_notice_predictions_are_counted_without_becoming_actionable():
+    truth = [label("n1", "Optional pre-bid meeting.", "notice", "optional")]
+    predictions = {
+        "requirements": [],
+        "review_queue": [],
+        "notices": [prediction("Optional pre-bid meeting.", mandatory=False)],
+        "excluded": [],
+    }
+
+    metrics = evaluate_predictions(truth, predictions, "doc-1")
+
+    assert metrics["notice_prediction_count"] == 1
+    assert metrics["matched_prediction_count"] == 1
+    assert metrics["actionable_precision"] is None
+
+
 def test_load_ground_truth_rejects_duplicates_and_invalid_labels(tmp_path):
     labels = tmp_path / "labels.csv"
     duplicate = label("r1", "Same quote", "actionable", "mandatory")

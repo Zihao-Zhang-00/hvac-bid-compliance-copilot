@@ -236,6 +236,51 @@ def test_analysis_partitions_actionable_review_and_excluded_candidates(monkeypat
     assert body["summary"]["excluded_count"] == 1
 
 
+def test_structural_only_page_does_not_call_model_or_create_requirement(monkeypatch):
+    llm = ReplayLLM(requirement(text="Page 1 of 1"))
+    configure(monkeypatch, llm)
+
+    response = post_pdf(make_pdf(["Page 1 of 1"]))
+
+    assert response.status_code == 200
+    assert response.json()["requirements"] == []
+    assert response.json()["review_queue"] == []
+    assert llm.calls == []
+
+
+def test_missed_brand_restriction_is_preserved_for_review(monkeypatch):
+    quote = "TRANE or an approved substitute."
+    configure(monkeypatch, ReplayLLM())
+
+    response = post_pdf(make_pdf([quote]))
+
+    assert response.status_code == 200
+    item = response.json()["review_queue"][0]["requirement"]
+    assert item["requirement_text"] == quote
+    assert item["source_trace"]["status"] == "matched"
+    assert item["source_trace"]["verified_source_page"] == 1
+
+
+def test_notices_and_date_conflicts_have_separate_counts(monkeypatch):
+    notice = requirement(text="The pre-bid meeting is optional.")
+    notice["mandatory"] = False
+    configure(monkeypatch, ReplayLLM(notice))
+
+    response = post_pdf(make_pdf([
+        "The pre-bid meeting is optional. Bid due date: May 1, 2026 at 2:00 PM",
+        "Bid submission deadline: May 2, 2026 at 2:00 PM",
+    ]))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["requirements"] == []
+    assert body["notices"][0]["reason"] == "optional_prebid_event"
+    assert body["date_conflicts"][0]["event_type"] == "bid_submission_deadline"
+    assert body["date_conflicts"][0]["source_pages"] == [1, 2]
+    assert body["summary"]["notice_count"] == 1
+    assert body["summary"]["date_conflict_count"] == 1
+
+
 def test_environment_factory_supports_existing_clients_without_defaults():
     ollama = completion_client_from_env({
         "LLM_PROVIDER": "ollama",
@@ -263,5 +308,7 @@ def test_dashboard_route_is_available_and_targets_analysis_api():
     assert "Source trace" in response.text
     assert "Actionable Requirements" in response.text
     assert "Needs Human Review" in response.text
+    assert "Notices / Context" in response.text
+    assert "Date Conflicts" in response.text
     assert "Excluded Candidates" in response.text
     assert "Download JSON" in response.text
