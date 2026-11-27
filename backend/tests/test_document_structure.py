@@ -54,3 +54,39 @@ def test_brand_constraint_that_looks_like_a_heading_is_preserved():
     masked = build_extraction_view([{"page_number": 2, "text": text}])
 
     assert masked[0]["text"].startswith("TRANE OR APPROVED SUBSTITUTE")
+
+
+def test_repeated_boundary_text_is_not_masked_when_identical_text_is_in_body():
+    pages = [
+        {
+            "page_number": 1,
+            "text": (
+                "HVAC PROCUREMENT 2026\n"
+                "First page introduction.\n"
+                "HVAC PROCUREMENT 2026\n"
+                "Substantive body context.\n"
+                "Procurement Office"
+            ),
+        },
+        {
+            "page_number": 2,
+            "text": (
+                "HVAC PROCUREMENT 2026\n"
+                "Second page introduction.\n"
+                "Different body text.\n"
+                "More substantive context.\n"
+                "Procurement Office"
+            ),
+        },
+    ]
+
+    masked = build_extraction_view(pages)
+    first_page_lines = masked[0]["text"].splitlines()
+    second_page_lines = masked[1]["text"].splitlines()
+
+    assert first_page_lines[0].strip() == ""
+    assert second_page_lines[0].strip() == ""
+    assert first_page_lines[-1].strip() == ""
+    assert second_page_lines[-1].strip() == ""
+    assert first_page_lines[2] == "HVAC PROCUREMENT 2026"
+    assert len(masked[0]["text"]) == len(pages[0]["text"])

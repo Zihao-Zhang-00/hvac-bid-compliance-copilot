@@ -31,11 +31,19 @@ def _normalized(line: str) -> str:
     return " ".join(line.casefold().split())
 
 
-def _boundary_lines(text: str) -> set[str]:
-    lines = [line for line in text.splitlines() if line.strip()]
-    if not lines:
+def _boundary_line_indexes(lines: list[str]) -> set[int]:
+    nonempty = [index for index, line in enumerate(lines) if line.strip()]
+    if not nonempty:
         return set()
-    return {_normalized(line) for line in lines[:2] + lines[-2:]}
+    return set(nonempty[:2] + nonempty[-2:])
+
+
+def _boundary_lines(text: str) -> set[str]:
+    lines = text.splitlines()
+    return {
+        _normalized(lines[index])
+        for index in _boundary_line_indexes(lines)
+    }
 
 
 def _is_clear_navigation(line: str) -> bool:
@@ -69,11 +77,14 @@ def build_extraction_view(pages: list[dict]) -> list[dict]:
 
     extraction_pages: list[dict] = []
     for page in pages:
+        lines = page["text"].splitlines(keepends=True)
+        boundary_indexes = _boundary_line_indexes(lines)
         masked_lines: list[str] = []
-        for line in page["text"].splitlines(keepends=True):
+        for index, line in enumerate(lines):
             normalized = _normalized(line)
             repeated_metadata = (
-                normalized in repeated_boundaries
+                index in boundary_indexes
+                and normalized in repeated_boundaries
                 and len(normalized) <= 120
                 and not _SUBSTANTIVE_SIGNAL.search(line)
             )
