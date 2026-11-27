@@ -1,6 +1,7 @@
 
 import json
 from typing import Protocol
+from app.requirement_classifier import classify_requirements
 
 from app.requirement_recovery import quarantine_unsupported_categories
 from app.requirement_quote_review import flag_unmatched_source_quotes
@@ -80,4 +81,6 @@ def extract_requirements(
     )
 
     reviewed = flag_uncertain_requirements(validated)
-    return flag_unmatched_source_quotes(reviewed, pages)
+    source_checked = flag_unmatched_source_quotes(reviewed, pages)
+
+    return classify_requirements(source_checked)
