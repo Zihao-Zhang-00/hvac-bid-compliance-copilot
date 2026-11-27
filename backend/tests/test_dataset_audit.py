@@ -136,9 +136,9 @@ def test_outputs_are_reproducible_and_annotation_template_is_blank(tmp_path):
                 "document_id",
                 "exact_quote",
                 "source_page",
+                "relevance_label",
+                "obligation_status",
                 "category",
-                "mandatory",
-                "actionable",
                 "evidence_required",
                 "reviewer_notes",
             ]

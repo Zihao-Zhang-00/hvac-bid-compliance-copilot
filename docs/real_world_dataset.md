@@ -44,9 +44,11 @@ Each run produces:
 - `requirement_annotations_template.csv`: header-only human annotation template.
 
 The annotation columns are `requirement_id`, `document_id`, `exact_quote`,
-`source_page`, `category`, `mandatory`, `actionable`, `evidence_required`, and
-`reviewer_notes`. Enter exact quotes manually; the audit command never exports
-document text.
+`source_page`, `relevance_label`, `obligation_status`, `category`,
+`evidence_required`, and `reviewer_notes`. Use `actionable`, `excluded`, or
+`review_required` for `relevance_label`; use `mandatory`, `optional`,
+`conditional`, or `uncertain` for `obligation_status`. Enter exact quotes and
+labels manually; the audit command never exports document text.
 
 ## Proposed document-level split
 

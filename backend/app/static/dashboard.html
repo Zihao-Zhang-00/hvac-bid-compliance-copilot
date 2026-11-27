@@ -56,7 +56,7 @@
   </section>
 
   <section id="requirements-panel" class="panel" hidden>
-    <h2>Requirements</h2>
+    <h2>Actionable Requirements</h2>
     <div class="filters">
       <label>Category <select id="category-filter"><option value="">All</option></select></label>
       <label>Mandatory <select id="mandatory-filter"><option value="">All</option><option value="true">Required</option><option value="false">Optional</option><option value="null">Unknown</option></select></label>
@@ -70,6 +70,26 @@
       </table>
     </div>
   </section>
+
+  <section id="review-panel" class="panel" hidden>
+    <h2>Needs Human Review</h2>
+    <p class="muted">These candidates remain visible because their applicability, classification, or source trace needs review.</p>
+    <p id="empty-review" class="muted">No candidates currently require human review.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Requirement</th><th>Reasons</th><th>Category</th><th>Mandatory</th><th>Original page</th><th>Verified page</th><th>Source trace</th></tr></thead>
+        <tbody id="review-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="excluded-panel" class="panel" hidden>
+    <details>
+      <summary><strong>Excluded Candidates</strong> (<span id="excluded-count">0</span>)</summary>
+      <p class="muted">Narrow, high-confidence background diagnostics. Review the downloaded JSON for full trace data.</p>
+      <ul id="excluded-list"></ul>
+    </details>
+  </section>
 </main>
 <script>
   const form = document.querySelector('#analysis-form');
@@ -78,7 +98,10 @@
   const downloadButton = document.querySelector('#download');
   const coveragePanel = document.querySelector('#coverage-panel');
   const requirementsPanel = document.querySelector('#requirements-panel');
+  const reviewPanel = document.querySelector('#review-panel');
+  const excludedPanel = document.querySelector('#excluded-panel');
   const requirementBody = document.querySelector('#requirements-body');
+  const reviewBody = document.querySelector('#review-body');
   const emptyResults = document.querySelector('#empty-results');
   const filters = ['category-filter', 'mandatory-filter', 'review-filter'].map(id => document.querySelector('#' + id));
   let responseData = null;
@@ -102,7 +125,9 @@
       metric('Requested pages', data.requested_pages.join(', ')),
       metric('Analyzed pages', data.analyzed_pages.join(', ')),
       metric('Unverified pages', data.pages_without_extractable_text.join(', ') || 'None'),
-      metric('Requirements', data.summary.requirement_count)
+      metric('Actionable', data.summary.requirement_count),
+      metric('Needs review', data.summary.review_queue_count),
+      metric('Excluded', data.summary.excluded_count)
     );
     const warning = document.querySelector('#coverage-warning');
     warning.replaceChildren();
@@ -161,12 +186,67 @@
     requirementsPanel.hidden = false;
   }
 
+  function appendTraceCell(row, trace) {
+    const traceCell = document.createElement('td');
+    const details = document.createElement('details');
+    const summary = document.createElement('summary');
+    summary.textContent = trace?.status || 'unverified';
+    const pre = document.createElement('pre');
+    pre.textContent = JSON.stringify(trace, null, 2);
+    details.append(summary, pre);
+    traceCell.append(details);
+    row.append(traceCell);
+  }
+
+  function renderReviewQueue() {
+    const items = responseData?.review_queue || [];
+    reviewBody.replaceChildren();
+    items.forEach(entry => {
+      const item = entry.requirement;
+      const trace = item.source_trace;
+      const row = document.createElement('tr');
+      const values = [
+        item.requirement_text,
+        entry.reasons.join('; '),
+        item.category,
+        item.mandatory === null ? 'Unknown' : item.mandatory ? 'Required' : 'Optional',
+        trace?.original_source_page ?? item.source_page,
+        trace?.verified_source_page ?? 'Unverified'
+      ];
+      values.forEach((value, index) => {
+        const cell = document.createElement('td');
+        cell.textContent = value;
+        if (index === 0) cell.className = 'requirement';
+        row.append(cell);
+      });
+      appendTraceCell(row, trace);
+      reviewBody.append(row);
+    });
+    document.querySelector('#empty-review').hidden = items.length !== 0;
+    reviewPanel.hidden = false;
+  }
+
+  function renderExcluded() {
+    const items = responseData?.excluded || [];
+    document.querySelector('#excluded-count').textContent = items.length;
+    const list = document.querySelector('#excluded-list');
+    list.replaceChildren();
+    items.forEach(item => {
+      const entry = document.createElement('li');
+      entry.textContent = `Page ${item.source_page}: ${item.reason} — ${item.requirement_text}`;
+      list.append(entry);
+    });
+    excludedPanel.hidden = false;
+  }
+
   form.addEventListener('submit', async event => {
     event.preventDefault();
     analyzeButton.disabled = true;
     downloadButton.disabled = true;
     coveragePanel.hidden = true;
     requirementsPanel.hidden = true;
+    reviewPanel.hidden = true;
+    excludedPanel.hidden = true;
     statusBox.className = 'notice muted';
     statusBox.textContent = 'Analyzing selected pages…';
     const data = new FormData(form);
@@ -182,6 +262,8 @@
       renderCoverage(payload);
       populateCategories(payload);
       renderRequirements();
+      renderReviewQueue();
+      renderExcluded();
       downloadButton.disabled = false;
     } catch (error) {
       responseData = null;
