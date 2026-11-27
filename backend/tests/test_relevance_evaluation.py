@@ -40,9 +40,10 @@ def label(identifier, quote, relevance, obligation, page=1):
     }
 
 
-def prediction(quote, *, page=1, status="matched"):
+def prediction(quote, *, page=1, status="matched", mandatory=True):
     return {
         "requirement_text": quote,
+        "mandatory": mandatory,
         "source_page": page,
         "source_trace": {
             "status": status,
@@ -61,23 +62,51 @@ def test_exact_normalized_matching_and_metrics():
     predictions = {
         "requirements": [
             prediction("  SUBMIT   equipment data. "),
-            prediction("The building was built in 1998."),
+            prediction("The building was built in 1998.", mandatory=False),
         ],
-        "review_queue": [{"requirement": prediction("Testing may be required.")}],
-        "excluded": [prediction("Attend the meeting.", page=2, status="missing")],
+        "review_queue": [{
+            "requirement": prediction("Testing may be required.", mandatory=None)
+        }],
+        "excluded": [prediction(
+            "Attend the meeting.", page=2, status="missing", mandatory=False
+        )],
     }
 
     metrics = evaluate_predictions(truth, predictions, "doc-1")
 
     assert metrics["actionable_precision"] == 0.5
     assert metrics["actionable_recall"] == 0.5
-    assert metrics["mandatory_requirement_recall"] == 1.0
+    assert metrics["mandatory_retention_recall"] == 1.0
+    assert metrics["mandatory_classification_recall"] == 1.0
     assert metrics["true_positive_count"] == 1
     assert metrics["false_positive_count"] == 1
     assert metrics["false_negative_count"] == 1
     assert metrics["review_queue_count"] == 1
     assert metrics["unmatched_source_count"] == 1
     assert metrics["matched_prediction_count"] == 4
+
+
+def test_mandatory_retention_and_classification_are_distinct():
+    truth = [
+        label("r1", "Submit data.", "actionable", "mandatory"),
+        label("r2", "Provide schedule.", "actionable", "mandatory"),
+        label("r3", "Testing applies.", "review_required", "mandatory"),
+    ]
+    predictions = {
+        "requirements": [
+            prediction("Submit data.", mandatory=True),
+            prediction("Provide schedule.", mandatory=False),
+        ],
+        "review_queue": [{
+            "requirement": prediction("Testing applies.", mandatory=None)
+        }],
+        "excluded": [],
+    }
+
+    metrics = evaluate_predictions(truth, predictions, "doc-1")
+
+    assert metrics["mandatory_retention_recall"] == 1.0
+    assert metrics["mandatory_classification_recall"] == pytest.approx(1 / 3)
 
 
 def test_load_ground_truth_rejects_duplicates_and_invalid_labels(tmp_path):

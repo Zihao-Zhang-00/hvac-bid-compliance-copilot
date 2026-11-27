@@ -103,7 +103,10 @@ class RelevanceResult(BaseModel):
     excluded: list[ExcludedCandidate]
 
 
-def _review_reasons(requirement: TenderRequirement) -> list[str]:
+def _review_reasons(
+    requirement: TenderRequirement,
+    exclusion_reason: str | None,
+) -> list[str]:
     reasons: list[str] = []
     if requirement.needs_review:
         reasons.append("existing review flag")
@@ -117,12 +120,14 @@ def _review_reasons(requirement: TenderRequirement) -> list[str]:
         reasons.append(f"source quote is {requirement.source_trace.status}")
     if _AMBIGUOUS_SIGNAL.search(requirement.requirement_text):
         reasons.append("potentially ambiguous applicability")
+    if exclusion_reason is not None and requirement.mandatory is True:
+        reasons.append(
+            "mandatory flag conflicts with apparently non-actionable context"
+        )
     return list(dict.fromkeys(reasons))
 
 
 def _exclusion_reason(requirement: TenderRequirement) -> str | None:
-    if requirement.mandatory is True:
-        return None
     if _OBLIGATION_SIGNAL.search(requirement.requirement_text):
         return None
     text = " ".join(requirement.requirement_text.split())
@@ -142,7 +147,8 @@ def partition_requirements(
     excluded: list[ExcludedCandidate] = []
 
     for candidate in result.requirements:
-        reasons = _review_reasons(candidate)
+        exclusion_reason = _exclusion_reason(candidate)
+        reasons = _review_reasons(candidate, exclusion_reason)
         if reasons:
             review_queue.append(
                 ReviewQueueItem(
@@ -155,7 +161,6 @@ def partition_requirements(
             )
             continue
 
-        exclusion_reason = _exclusion_reason(candidate)
         if exclusion_reason is not None:
             excluded.append(
                 ExcludedCandidate(

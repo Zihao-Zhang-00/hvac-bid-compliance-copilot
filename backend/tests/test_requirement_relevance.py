@@ -61,6 +61,31 @@ def test_clear_background_and_definition_candidates_are_excluded():
     ]
 
 
+def test_background_mislabeled_mandatory_is_sent_to_review():
+    result = partition(
+        candidate("The project was constructed in 1998.", mandatory=True),
+        candidate("The owner is seeking HVAC design services.", mandatory=True),
+    )
+
+    assert result.requirements == []
+    assert result.excluded == []
+    assert len(result.review_queue) == 2
+    assert all(
+        "mandatory flag conflicts with apparently non-actionable context"
+        in item.reasons
+        for item in result.review_queue
+    )
+
+
+def test_procurement_description_without_conflict_is_excluded():
+    result = partition(
+        candidate("The district is seeking HVAC design services.", mandatory=False)
+    )
+
+    assert result.review_queue == []
+    assert result.excluded[0].reason == "procurement_description"
+
+
 def test_mandatory_optional_and_distinct_obligations_are_not_removed():
     mandatory = candidate("The bidder shall submit the equipment schedule.", mandatory=True)
     optional = candidate("Attendance at the site visit is optional.", mandatory=False)
@@ -72,6 +97,19 @@ def test_mandatory_optional_and_distinct_obligations_are_not_removed():
     assert result.review_queue == []
     assert result.excluded == []
     assert result.requirements[1].mandatory is False
+
+
+def test_genuine_mandatory_obligation_overrides_background_shape():
+    obligation = candidate(
+        "The project requires the bidder to submit an equipment schedule.",
+        mandatory=True,
+    )
+
+    result = partition(obligation)
+
+    assert result.requirements == [obligation]
+    assert result.review_queue == []
+    assert result.excluded == []
 
 
 def test_conditional_ambiguous_and_unmatched_candidates_are_reviewed():

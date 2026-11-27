@@ -95,6 +95,11 @@ def evaluate_predictions(
     review_keys = {_prediction_key(document_id, item) for item in review_items}
     excluded_keys = {_prediction_key(document_id, item) for item in excluded_items}
     retained_keys = actionable_keys | review_keys
+    mandatory_true_keys = {
+        _prediction_key(document_id, item)
+        for item in actionable_items + review_items
+        if _prediction_requirement(item).get("mandatory") is True
+    }
 
     truth_actionable = {
         _key(row["document_id"], row["source_page"], row["exact_quote"])
@@ -113,6 +118,7 @@ def evaluate_predictions(
     precision_denominator = true_positives + false_positives
     recall_denominator = true_positives + false_negatives
     mandatory_matches = len(truth_mandatory & retained_keys)
+    mandatory_classification_matches = len(truth_mandatory & mandatory_true_keys)
 
     all_items = actionable_items + review_items + excluded_items
     unmatched_source_count = 0
@@ -131,8 +137,13 @@ def evaluate_predictions(
         "actionable_recall": (
             true_positives / recall_denominator if recall_denominator else None
         ),
-        "mandatory_requirement_recall": (
+        "mandatory_retention_recall": (
             mandatory_matches / len(truth_mandatory) if truth_mandatory else None
+        ),
+        "mandatory_classification_recall": (
+            mandatory_classification_matches / len(truth_mandatory)
+            if truth_mandatory
+            else None
         ),
         "true_positive_count": true_positives,
         "false_positive_count": false_positives,

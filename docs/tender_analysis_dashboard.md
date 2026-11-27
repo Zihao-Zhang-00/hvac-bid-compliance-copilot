@@ -98,8 +98,10 @@ collections:
 
 Candidates with an existing review flag, uncertain mandatory status, unknown
 category, ambiguous applicability, or missing/ambiguous source match remain in
-`review_queue`. Explicit obligations and disqualification language are never
-excluded by the deterministic relevance gate. Excluded candidates are not
+`review_queue`. A model-supplied mandatory flag that conflicts with a narrow,
+clearly non-actionable semantic signal is also sent to review rather than being
+trusted or excluded. Explicit obligations and disqualification language are
+never excluded by the deterministic relevance gate. Excluded candidates are not
 counted in `summary.requirement_count`; additive summary fields report review
 and exclusion counts. The extraction function and source-tracing models remain
 unchanged, but API consumers should account for the new collections.
@@ -123,11 +125,16 @@ confirmed labels, save an analysis response as JSON, then run from `backend`:
 
 Matching is exact on `document_id`, one-based source page, and the quote after
 case-folding and whitespace normalization. The report includes actionable
-precision/recall, mandatory requirement recall, false-positive/false-negative
-counts, review-queue count, and unmatched-source count. Mandatory recall treats
+precision/recall, mandatory retention recall, mandatory classification recall,
+false-positive/false-negative counts, review-queue count, and unmatched-source
+count. `mandatory_retention_recall` is the safety metric: it treats manually
 mandatory candidates retained in either actionable results or the review queue
-as recalled. The command refuses missing or invalid labels and never creates
-annotations or inferred ground truth.
+as retained, regardless of the predicted mandatory value.
+`mandatory_classification_recall` counts only exact-matched, manually mandatory
+candidates retained in those collections with predicted `mandatory=true`;
+optional, uncertain, and missing predictions are not correct classifications.
+The command refuses missing or invalid labels and never creates annotations or
+inferred ground truth.
 
 Use NWACC for development, Glendale for validation, and Worcester only as the
 held-out test. Do not tune rules after inspecting Worcester results. Report no
