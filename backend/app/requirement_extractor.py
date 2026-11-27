@@ -73,7 +73,7 @@ def extract_requirements(
     raw_json = client.complete(SYSTEM_PROMPT, user_prompt)
 
     recovered_json = quarantine_unsupported_categories(raw_json)
-    recovered_json = reconcile_source_pages(recovered_json, pages)
+    recovered_json = reconcile_source_pages(recovered_json, pages, include_trace=True)
 
     validated = validate_and_normalize_requirements(
         recovered_json,

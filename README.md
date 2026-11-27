@@ -81,3 +81,9 @@ This project follows an Agile and DevOps workflow using:
 Only synthetic or anonymized sample data will be stored in this public
 repository. Real company bid documents, employee credentials, pricing,
 and other sensitive business information will not be committed.
+
+## Source Tracing (US-05)
+
+See [the source tracing contract and validation guide](docs/us05-source-tracing.md)
+for verified versus model-reported pages, original-text evidence, review rules,
+acceptance mapping, and reproducible tests.
