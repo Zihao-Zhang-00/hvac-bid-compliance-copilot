@@ -205,6 +205,12 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Real-world HVAC datasets and generated local audit artifacts
+HVAC-Real-Dataset/
+real-world-dataset/
+dataset-audit-output/
+**/dataset-audit-output/
+
 # Ruff stuff:
 .ruff_cache/
 
