@@ -93,10 +93,12 @@ def test_mandatory_optional_and_distinct_obligations_are_not_removed():
 
     result = partition(mandatory, optional, second)
 
-    assert result.requirements == [mandatory, optional, second]
+    assert result.requirements == [mandatory, second]
     assert result.review_queue == []
     assert result.excluded == []
-    assert result.requirements[1].mandatory is False
+    assert result.notices[0].requirement_text == optional.requirement_text
+    assert result.notices[0].mandatory is False
+    assert result.notices[0].reason == "optional_prebid_event"
 
 
 def test_genuine_mandatory_obligation_overrides_background_shape():
@@ -154,3 +156,47 @@ def test_partition_does_not_mutate_input_candidate():
     assert original.needs_review is False
     assert result.review_queue[0].requirement.needs_review is True
     assert result.review_queue[0].requirement is not original
+
+
+def test_optional_prebid_and_interpretive_definition_are_notices():
+    result = partition(
+        candidate("The optional pre-bid meeting will be held on Tuesday."),
+        candidate('The term "shall" means a mandatory obligation.'),
+    )
+
+    assert result.requirements == []
+    assert result.review_queue == []
+    assert [item.reason for item in result.notices] == [
+        "optional_prebid_event",
+        "interpretation_definition",
+    ]
+
+
+def test_optional_event_with_real_condition_remains_actionable():
+    clause = candidate(
+        "The pre-bid meeting is optional, but attendees must register.",
+        mandatory=True,
+    )
+
+    result = partition(clause)
+
+    assert result.requirements == [clause]
+    assert result.notices == []
+
+
+def test_contact_information_is_notice_but_ambiguous_contact_clause_is_reviewed():
+    notice = candidate(
+        "Questions may be directed to bids@example.com.",
+        category="unknown",
+    )
+    ambiguous = candidate(
+        "Questions may be directed to bids@example.com as applicable.",
+        mandatory=None,
+    )
+
+    result = partition(notice, ambiguous)
+
+    assert result.notices[0].reason == "contact_information"
+    assert result.review_queue[0].requirement == ambiguous.model_copy(
+        update={"needs_review": True}
+    )

@@ -5,13 +5,21 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from app.document_structure import build_extraction_view
 from app.requirement_extractor import CompletionClient, extract_requirements
+from app.requirement_recall import find_uncovered_critical_passages
 from app.requirement_relevance import (
     ExcludedCandidate,
+    NoticeCandidate,
     ReviewQueueItem,
     partition_requirements,
 )
-from app.requirement_schema import RequirementCategory, TenderRequirement
+from app.requirement_schema import (
+    RequirementCategory,
+    RequirementExtractionResult,
+    TenderRequirement,
+)
+from app.tender_date_conflicts import DateConflict, detect_date_conflicts
 
 
 MAX_ANALYSIS_PAGES = 50
@@ -52,7 +60,9 @@ class AnalysisSummary(BaseModel):
     requirement_count: int
     needs_review_count: int
     review_queue_count: int
+    notice_count: int
     excluded_count: int
+    date_conflict_count: int
     mandatory_count: int
     optional_count: int
     unknown_mandatory_count: int
@@ -73,7 +83,9 @@ class TenderAnalysisResponse(BaseModel):
     coverage: DocumentCoverage
     requirements: list[TenderRequirement]
     review_queue: list[ReviewQueueItem]
+    notices: list[NoticeCandidate]
     excluded: list[ExcludedCandidate]
+    date_conflicts: list[DateConflict]
     summary: AnalysisSummary
 
 
@@ -113,12 +125,15 @@ def _requested_pages(
 def _summary(
     requirements: list[TenderRequirement],
     review_queue: list[ReviewQueueItem],
+    notices: list[NoticeCandidate],
     excluded: list[ExcludedCandidate],
+    date_conflicts: list[DateConflict],
     input_text_characters: int,
 ) -> AnalysisSummary:
     categories = Counter(requirement.category.value for requirement in requirements)
     retained = requirements + [item.requirement for item in review_queue]
     trace_values = [item.source_trace for item in retained]
+    trace_values.extend(item.source_trace for item in notices)
     trace_values.extend(item.source_trace for item in excluded)
     traces = Counter(
         trace.status if trace is not None else "unverified"
@@ -128,7 +143,9 @@ def _summary(
         requirement_count=len(requirements),
         needs_review_count=len(review_queue),
         review_queue_count=len(review_queue),
+        notice_count=len(notices),
         excluded_count=len(excluded),
+        date_conflict_count=len(date_conflicts),
         mandatory_count=sum(item.mandatory is True for item in requirements),
         optional_count=sum(item.mandatory is False for item in requirements),
         unknown_mandatory_count=sum(item.mandatory is None for item in requirements),
@@ -184,8 +201,20 @@ def analyze_parsed_tender(
             status_code=413,
         )
 
-    extraction = extract_requirements(selected_pages, client)
+    extraction_pages = build_extraction_view(selected_pages)
+    if any(page["text"].strip() for page in extraction_pages):
+        extraction = extract_requirements(
+            extraction_pages,
+            client,
+            source_pages=selected_pages,
+        )
+    else:
+        extraction = RequirementExtractionResult(requirements=[])
+    extraction.requirements.extend(
+        find_uncovered_critical_passages(selected_pages, extraction)
+    )
     relevance = partition_requirements(extraction)
+    date_conflicts = detect_date_conflicts(selected_pages)
     all_pages = list(range(1, total_page_count + 1))
     full_document_requested = requested_pages == all_pages
     unanalyzed_pages = [page for page in all_pages if page not in analyzed_pages]
@@ -222,11 +251,15 @@ def analyze_parsed_tender(
         ),
         requirements=relevance.requirements,
         review_queue=relevance.review_queue,
+        notices=relevance.notices,
         excluded=relevance.excluded,
+        date_conflicts=date_conflicts,
         summary=_summary(
             relevance.requirements,
             relevance.review_queue,
+            relevance.notices,
             relevance.excluded,
+            date_conflicts,
             input_text_characters,
         ),
     )
