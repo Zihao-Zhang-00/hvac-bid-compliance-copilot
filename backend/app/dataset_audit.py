@@ -21,6 +21,8 @@ OUTPUT_DIRECTORY_NAME = "dataset-audit-output"
 INVENTORY_FIELDS = (
     "document_id",
     "relative_path",
+    "project_group",
+    "dataset_split",
     "file_type",
     "size_bytes",
     "sha256",
@@ -34,9 +36,10 @@ INVENTORY_FIELDS = (
 )
 
 ANNOTATION_FIELDS = (
+    "requirement_id",
     "document_id",
     "exact_quote",
-    "pdf_page",
+    "source_page",
     "category",
     "mandatory",
     "actionable",
@@ -57,6 +60,28 @@ def make_document_id(relative_path: str) -> str:
     return f"doc_{digest[:16]}"
 
 
+def infer_project_metadata(relative_path: str) -> tuple[str, str | None]:
+    """Map known document families to stable project-level dataset splits."""
+
+    parts = {
+        part.casefold()
+        for part in Path(unicodedata.normalize("NFC", relative_path)).parts
+    }
+    projects = {
+        "nwacc_2026": "development",
+        "glendale_2026": "validation",
+        "worcester_2026": "held_out",
+    }
+    for project_group, dataset_split in projects.items():
+        if project_group in parts:
+            return project_group, dataset_split
+
+    if "厂家技术手册" in parts:
+        return "manufacturer_catalogs", None
+
+    return "unknown", None
+
+
 def infer_document_role(relative_path: str, file_type: str) -> str:
     """Infer a conservative role from path and filename signals."""
 
@@ -67,6 +92,7 @@ def infer_document_role(relative_path: str, file_type: str) -> str:
     path = Path(normalized)
     parts = set(path.parts)
     searchable = " ".join(path.parts).replace("_", "-")
+    filename = path.name.replace("_", " ").replace("-", " ")
 
     if "厂家技术手册" in parts or any(
         marker in searchable
@@ -100,6 +126,11 @@ def infer_document_role(relative_path: str, file_type: str) -> str:
             "mechanical-plans",
             "mechanical plans",
         )
+    ):
+        return "drawing"
+
+    if "worcester_2026" in parts and any(
+        marker in filename for marker in ("permit set", "redesign")
     ):
         return "drawing"
 
@@ -178,13 +209,19 @@ def _inventory_file(
 ) -> dict[str, Any]:
     relative_path = _normalized_relative_path(path.relative_to(dataset_root))
     file_type = path.suffix.casefold().lstrip(".")
+    document_role = infer_document_role(relative_path, file_type)
+    project_group, dataset_split = infer_project_metadata(relative_path)
+    if document_role == "manufacturer catalog":
+        dataset_split = None
     record: dict[str, Any] = {
         "document_id": make_document_id(relative_path),
         "relative_path": relative_path,
+        "project_group": project_group,
+        "dataset_split": dataset_split,
         "file_type": file_type,
         "size_bytes": None,
         "sha256": None,
-        "document_role": infer_document_role(relative_path, file_type),
+        "document_role": document_role,
         "pdf_page_count": None,
         "extractable_text_page_count": 0,
         "extractable_text_pages": [],

@@ -6,8 +6,8 @@ import pytest
 from reportlab.pdfgen import canvas
 
 from app.dataset_audit import (
-    ANNOTATION_FIELDS,
     infer_document_role,
+    infer_project_metadata,
     inventory_dataset,
     main,
     make_document_id,
@@ -49,7 +49,11 @@ def test_inventory_handles_unicode_nested_paths_and_page_statistics(tmp_path):
     assert pdf["low_text_pages"] == [3]
     assert pdf["parsing_failure"] is None
     assert len(pdf["sha256"]) == 64
+    assert pdf["project_group"] == "manufacturer_catalogs"
+    assert pdf["dataset_split"] is None
     assert documents[0]["document_role"] == "spreadsheet"
+    assert documents[0]["project_group"] == "nwacc_2026"
+    assert documents[0]["dataset_split"] == "development"
 
 
 def test_malformed_pdf_is_recorded_without_stopping_inventory(tmp_path):
@@ -70,6 +74,9 @@ def test_malformed_pdf_is_recorded_without_stopping_inventory(tmp_path):
     [
         ("tenders/nwacc_2026/Addendum 2.pdf", "pdf", "addendum"),
         ("tenders/glendale_2026/Mechanical Plans.pdf", "pdf", "drawing"),
+        ("tenders/worcester_2026/HVAC Permit Set.pdf", "pdf", "drawing"),
+        ("tenders/worcester_2026/AHU Redesign.pdf", "pdf", "drawing"),
+        ("misc/Redesign notes.pdf", "pdf", "unknown"),
         ("tenders/worcester_2026/Bid Tabulation.pdf", "pdf", "bid result"),
         ("tenders/worcester_2026/Invitation.pdf", "pdf", "tender"),
         ("misc/ambiguous.pdf", "pdf", "unknown"),
@@ -78,6 +85,26 @@ def test_malformed_pdf_is_recorded_without_stopping_inventory(tmp_path):
 )
 def test_role_inference_is_conservative(relative_path, file_type, expected):
     assert infer_document_role(relative_path, file_type) == expected
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "expected"),
+    [
+        ("tenders/nwacc_2026/Tender.pdf", ("nwacc_2026", "development")),
+        (
+            "tenders/glendale_2026/Addendum.pdf",
+            ("glendale_2026", "validation"),
+        ),
+        (
+            "tenders/worcester_2026/Permit Set.pdf",
+            ("worcester_2026", "held_out"),
+        ),
+        ("厂家技术手册/Carrier/Catalog.pdf", ("manufacturer_catalogs", None)),
+        ("misc/ambiguous.pdf", ("unknown", None)),
+    ],
+)
+def test_project_metadata_uses_document_level_splits(relative_path, expected):
+    assert infer_project_metadata(relative_path) == expected
 
 
 def test_outputs_are_reproducible_and_annotation_template_is_blank(tmp_path):
@@ -93,10 +120,29 @@ def test_outputs_are_reproducible_and_annotation_template_is_blank(tmp_path):
     payload = json.loads(first["json"].read_text(encoding="utf-8"))
     assert payload["summary"]["document_count"] == 1
     assert payload["summary"]["parsing_failure_count"] == 0
+    assert payload["documents"][0]["project_group"] == "nwacc_2026"
+    assert payload["documents"][0]["dataset_split"] == "development"
     assert "B" * 80 not in first["json"].read_text(encoding="utf-8")
 
+    with first["csv"].open(encoding="utf-8", newline="") as source:
+        inventory_row = next(csv.DictReader(source))
+    assert inventory_row["project_group"] == "nwacc_2026"
+    assert inventory_row["dataset_split"] == "development"
+
     with first["annotations"].open(encoding="utf-8", newline="") as source:
-        assert list(csv.reader(source)) == [list(ANNOTATION_FIELDS)]
+        assert list(csv.reader(source)) == [
+            [
+                "requirement_id",
+                "document_id",
+                "exact_quote",
+                "source_page",
+                "category",
+                "mandatory",
+                "actionable",
+                "evidence_required",
+                "reviewer_notes",
+            ]
+        ]
 
 
 def test_cli_writes_default_outputs_and_prints_summary(tmp_path, capsys):

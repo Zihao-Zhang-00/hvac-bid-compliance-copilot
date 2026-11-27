@@ -43,9 +43,10 @@ Each run produces:
 - `audit_summary.txt`: concise counts for documents, pages, roles, and failures;
 - `requirement_annotations_template.csv`: header-only human annotation template.
 
-The annotation columns are `document_id`, `exact_quote`, `pdf_page`, `category`,
-`mandatory`, `actionable`, `evidence_required`, and `reviewer_notes`. Enter exact
-quotes manually; the audit command never exports document text.
+The annotation columns are `requirement_id`, `document_id`, `exact_quote`,
+`source_page`, `category`, `mandatory`, `actionable`, `evidence_required`, and
+`reviewer_notes`. Enter exact quotes manually; the audit command never exports
+document text.
 
 ## Proposed document-level split
 
@@ -57,6 +58,11 @@ in the same split to avoid document-family leakage:
 | NWACC 2026 | Development |
 | Glendale 2026 | Validation |
 | Worcester 2026 | Held-out test |
+
+Inventory records encode these as `development`, `validation`, and `held_out`.
+The `project_group` values are `nwacc_2026`, `glendale_2026`, and
+`worcester_2026`. Manufacturer catalogs use `manufacturer_catalogs` with a null
+`dataset_split`; unrecognized projects use `unknown` with a null split.
 
 Manufacturer catalogs should be treated as shared reference material, not
 randomly split pages. Record any later benchmark policy for shared catalogs
@@ -74,7 +80,9 @@ before reporting evaluation results.
 - XLSX files are inventoried and hashed but their workbook contents are not
   parsed.
 - Roles are inferred conservatively from declared directory structure and clear
-  filename markers. Ambiguous files remain `unknown`.
+  filename markers. Worcester filenames containing `Permit Set` or `Redesign`
+  are treated as drawings only within the Worcester project. Ambiguous files
+  remain `unknown`.
 
 ## Privacy and Git hygiene
 
